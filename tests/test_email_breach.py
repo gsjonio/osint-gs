@@ -47,7 +47,7 @@ async def test_no_api_key_returns_manual_check_without_http_call() -> None:
 
     assert len(findings) == 1
     assert findings[0].risk == RiskLevel.LOW
-    assert "haveibeenpwned.com/account/me@example.com" in findings[0].source_url
+    assert "haveibeenpwned.com/account/me%40example.com" in findings[0].source_url
 
 
 async def test_no_email_returns_nothing() -> None:

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -47,12 +48,13 @@ class EmailBreachCollector(Collector):
             "hibp-api-key": self._config.hibp_api_key,
             "user-agent": self._config.user_agent,
         }
+        email_path = quote(target.email, safe="")
         async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT, headers=headers) as client:
             breaches = await self._get_json(
-                client, f"{_API_BASE}/breachedaccount/{target.email}?truncateResponse=false"
+                client, f"{_API_BASE}/breachedaccount/{email_path}?truncateResponse=false"
             )
             await asyncio.sleep(_MIN_REQUEST_INTERVAL)
-            pastes = await self._get_json(client, f"{_API_BASE}/pasteaccount/{target.email}")
+            pastes = await self._get_json(client, f"{_API_BASE}/pasteaccount/{email_path}")
 
         findings = [self._breach_finding(target.email, b) for b in breaches or []]
         findings += [self._paste_finding(target.email, p) for p in pastes or []]
@@ -80,7 +82,7 @@ class EmailBreachCollector(Collector):
                 "(the HIBP API is a paid feature). Free alternative: check this email "
                 "manually on HIBP's public web form."
             ),
-            source_url=f"https://haveibeenpwned.com/account/{email}",
+            source_url=f"https://haveibeenpwned.com/account/{quote(email, safe='')}",
             confidence=1.0,
             risk=RiskLevel.LOW,
             raw={},
