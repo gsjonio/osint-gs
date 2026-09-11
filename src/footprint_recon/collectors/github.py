@@ -49,23 +49,30 @@ class GithubCollector(Collector):
         if not target.usernames:
             return []
 
-        headers = {
-            "user-agent": self._config.user_agent,
-            "accept": "application/vnd.github+json",
-        }
+        api_headers = {"accept": "application/vnd.github+json"}
         if self._config.github_token:
-            headers["authorization"] = f"Bearer {self._config.github_token}"
+            api_headers["authorization"] = f"Bearer {self._config.github_token}"
 
-        async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT, headers=headers) as client:
+        # Base client headers apply to every request, including the plain github.com
+        # .patch fetches below — so the token/accept header only go on the explicit
+        # api.github.com call via `headers=api_headers`, not to every host we touch.
+        base_headers = {"user-agent": self._config.user_agent}
+        async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT, headers=base_headers) as client:
             findings: list[Finding] = []
             for username in target.usernames:
-                findings += await self._collect_for_username(client, target.email, username)
+                findings += await self._collect_for_username(
+                    client, api_headers, target.email, username
+                )
             return findings
 
     async def _collect_for_username(
-        self, client: httpx.AsyncClient, target_email: str | None, username: str
+        self,
+        client: httpx.AsyncClient,
+        api_headers: dict[str, str],
+        target_email: str | None,
+        username: str,
     ) -> list[Finding]:
-        commits = await self._recent_push_commits(client, username)
+        commits = await self._recent_push_commits(client, api_headers, username)
         if not commits:
             return []
 
@@ -87,10 +94,10 @@ class GithubCollector(Collector):
         ]
 
     async def _recent_push_commits(
-        self, client: httpx.AsyncClient, username: str
+        self, client: httpx.AsyncClient, api_headers: dict[str, str], username: str
     ) -> list[tuple[str, str]]:
         """Return up to `_MAX_COMMITS_PER_USER` (repo, sha) pairs from recent public pushes."""
-        response = await client.get(_EVENTS_URL.format(username=username))
+        response = await client.get(_EVENTS_URL.format(username=username), headers=api_headers)
         if response.status_code in (404, 403):
             return []
         response.raise_for_status()

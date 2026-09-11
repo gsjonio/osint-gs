@@ -127,3 +127,22 @@ async def test_github_token_sent_as_bearer_header(patch_client) -> None:
     await collector.collect(Target(usernames=["alice"]))
 
     assert seen_auth == ["Bearer fake-token"]
+
+
+async def test_github_token_is_not_sent_to_patch_requests(patch_client) -> None:
+    """The token is only needed (and only sent) for api.github.com, never for the
+    unauthenticated github.com/.../commit/{sha}.patch fetches."""
+    seen_auth = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "events/public" in str(request.url):
+            return httpx.Response(200, json=_events("a" * 40))
+        seen_auth.append(request.headers.get("authorization"))
+        return httpx.Response(200, text=_patch("me@example.com"))
+
+    patch_client(handler)
+
+    collector = GithubCollector(config=_WITH_TOKEN_CONFIG)
+    await collector.collect(Target(usernames=["alice"]))
+
+    assert seen_auth == [None]
