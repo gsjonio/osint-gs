@@ -80,6 +80,23 @@ async def test_device_without_gps_yields_low_risk_finding(tmp_path: Path) -> Non
     assert "Captured: 2024:01:02 03:04:05" in finding.detail
 
 
+async def test_malformed_gps_data_degrades_to_non_gps_tags(tmp_path: Path) -> None:
+    path = tmp_path / "bad_gps.jpg"
+    img = Image.new("RGB", (4, 4), color="green")
+    exif = img.getexif()
+    exif[_MAKE] = "TestMake"
+    # Only 2 of the expected 3 (degrees, minutes, seconds) rationals: valid TIFF,
+    # but our unpacking can't make sense of it.
+    exif[_GPS_IFD] = {1: "N", 2: (IFDRational(37, 1), IFDRational(46, 1)), 3: "W", 4: (1, 2, 3)}
+    img.save(path, exif=exif)
+
+    findings = await MetadataCollector().collect(Target(file_paths=[path]))
+
+    assert len(findings) == 1
+    assert findings[0].risk == RiskLevel.LOW
+    assert not any(i.type == IdentifierType.LOCATION for i in findings[0].identifiers)
+
+
 async def test_nonexistent_or_non_image_file_is_skipped(tmp_path: Path) -> None:
     bogus = tmp_path / "not_an_image.txt"
     bogus.write_text("hello")

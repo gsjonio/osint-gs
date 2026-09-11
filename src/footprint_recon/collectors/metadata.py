@@ -57,7 +57,11 @@ class MetadataCollector(Collector):
         detail_parts: list[str] = []
         risk = RiskLevel.LOW
 
-        coords = self._decimal_coords(gps)
+        try:
+            coords = self._decimal_coords(gps)
+        except (TypeError, ValueError, ZeroDivisionError):
+            # Malformed GPS fields in a corrupted/edge-case file; keep the non-GPS tags.
+            coords = None
         if coords is not None:
             lat, lon = coords
             identifiers.append(
