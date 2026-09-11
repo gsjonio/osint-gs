@@ -78,6 +78,8 @@ class Target(BaseModel):
     phone: str | None = None
     cpf: str | None = None
     domains: list[str] = Field(default_factory=list)
+    location: str | None = None
+    """Home city/region, e.g. for the `"{full_name}" "{location}"` dork."""
 
     def identifiers(self) -> list[Identifier]:
         """Flatten the populated fields into :class:`Identifier` objects."""
@@ -97,4 +99,6 @@ class Target(BaseModel):
         result.extend(
             Identifier(type=IdentifierType.DOMAIN, value=domain) for domain in self.domains
         )
+        if self.location:
+            result.append(Identifier(type=IdentifierType.LOCATION, value=self.location))
         return result
