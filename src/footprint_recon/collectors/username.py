@@ -111,7 +111,13 @@ class UsernameCollector(Collector):
         username: str,
         site: dict[str, Any],
     ) -> Finding | None:
-        url = site["uri_check"].format(account=quote(username, safe=""))
+        try:
+            url = site["uri_check"].format(account=quote(username, safe=""))
+        except (KeyError, IndexError):
+            # Malformed template in the third-party dataset; skip this site rather
+            # than crash the whole run.
+            return None
+
         async with semaphore:
             try:
                 response = await client.get(url)
