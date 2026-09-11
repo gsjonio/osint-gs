@@ -66,6 +66,22 @@ async def test_gps_yields_high_risk_location_finding(tmp_path: Path) -> None:
     assert lon == pytest.approx(-(122 + 25 / 60 + 10 / 3600))
 
 
+async def test_same_filename_in_different_dirs_get_distinct_source_urls(tmp_path: Path) -> None:
+    """Regression: Aggregator dedups findings by (collector, title, source_url); a source_url
+    of just the basename would make two same-named files collide and silently drop one."""
+    dir_a, dir_b = tmp_path / "a", tmp_path / "b"
+    dir_a.mkdir()
+    dir_b.mkdir()
+    path_a, path_b = dir_a / "photo.jpg", dir_b / "photo.jpg"
+    _make_image(path_a, with_device=True)
+    _make_image(path_b, with_device=True)
+
+    findings = await MetadataCollector().collect(Target(file_paths=[path_a, path_b]))
+
+    assert len(findings) == 2
+    assert findings[0].source_url != findings[1].source_url
+
+
 async def test_device_without_gps_yields_low_risk_finding(tmp_path: Path) -> None:
     path = tmp_path / "with_device.jpg"
     _make_image(path, with_device=True)

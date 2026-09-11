@@ -93,7 +93,10 @@ class MetadataCollector(Collector):
             identifiers=identifiers,
             title=f"EXIF metadata found in {path.name}",
             detail="; ".join(detail_parts),
-            source_url=None,
+            # Not a real URL, but a unique, meaningful reference to the exact file — also
+            # keeps the Aggregator's (collector, title, source_url) dedup key from colliding
+            # on two different files that happen to share a basename.
+            source_url=path.resolve().as_uri(),
             confidence=1.0,
             risk=risk,
             raw=raw,
