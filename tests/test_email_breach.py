@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import httpx
-import pytest
 
 from footprint_recon.collectors.email_breach import EmailBreachCollector
 from footprint_recon.config import Config
@@ -55,7 +54,7 @@ async def test_no_email_returns_nothing() -> None:
     assert await collector.collect(Target()) == []
 
 
-async def test_breach_and_paste_parsed_into_findings(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_breach_and_paste_parsed_into_findings(patch_client) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if "breachedaccount" in request.url.path:
             return httpx.Response(200, json=[_BREACH, _CPF_BREACH])
@@ -63,7 +62,7 @@ async def test_breach_and_paste_parsed_into_findings(monkeypatch: pytest.MonkeyP
             return httpx.Response(200, json=[_PASTE])
         raise AssertionError(f"unexpected URL: {request.url}")
 
-    _patch_client(monkeypatch, handler)
+    patch_client(handler)
 
     collector = EmailBreachCollector(config=_WITH_KEY_CONFIG)
     findings = await collector.collect(Target(email="me@example.com"))
@@ -75,11 +74,11 @@ async def test_breach_and_paste_parsed_into_findings(monkeypatch: pytest.MonkeyP
     assert by_title["Paste on Pastebin"].risk == RiskLevel.MEDIUM
 
 
-async def test_404_is_treated_as_no_results(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_404_is_treated_as_no_results(patch_client) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(404)
 
-    _patch_client(monkeypatch, handler)
+    patch_client(handler)
 
     collector = EmailBreachCollector(config=_WITH_KEY_CONFIG)
     findings = await collector.collect(Target(email="me@example.com"))
@@ -87,7 +86,7 @@ async def test_404_is_treated_as_no_results(monkeypatch: pytest.MonkeyPatch) -> 
     assert findings == []
 
 
-async def test_429_retries_after_retry_after_header(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_429_retries_after_retry_after_header(patch_client) -> None:
     calls = {"breachedaccount": 0}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -98,21 +97,10 @@ async def test_429_retries_after_retry_after_header(monkeypatch: pytest.MonkeyPa
             return httpx.Response(200, json=[_BREACH])
         return httpx.Response(404)
 
-    _patch_client(monkeypatch, handler)
+    patch_client(handler)
 
     collector = EmailBreachCollector(config=_WITH_KEY_CONFIG)
     findings = await collector.collect(Target(email="me@example.com"))
 
     assert calls["breachedaccount"] == 2
     assert len(findings) == 1
-
-
-def _patch_client(monkeypatch: pytest.MonkeyPatch, handler) -> None:
-    """Route httpx.AsyncClient through a MockTransport instead of the real network."""
-    real_init = httpx.AsyncClient.__init__
-
-    def patched_init(self, *args, **kwargs):
-        kwargs["transport"] = httpx.MockTransport(handler)
-        real_init(self, *args, **kwargs)
-
-    monkeypatch.setattr(httpx.AsyncClient, "__init__", patched_init)
