@@ -21,7 +21,8 @@ from footprint_recon.config import Config, load_config
 from footprint_recon.models import Finding, Identifier, IdentifierType, RiskLevel, Target
 
 _PROFILE_URL = "https://www.gravatar.com/{hash}.json"
-_AVATAR_URL = "https://www.gravatar.com/avatar/{hash}?d=404"
+_AVATAR_PAGE_URL = "https://www.gravatar.com/avatar/{hash}"
+_AVATAR_CHECK_URL = _AVATAR_PAGE_URL + "?d=404"
 _REQUEST_TIMEOUT = 10.0
 
 
@@ -67,7 +68,7 @@ class GravatarCollector(Collector):
 
     async def _has_public_avatar(self, client: httpx.AsyncClient, email_hash: str) -> bool:
         """HEAD-check the avatar so we don't download image bytes just to see if it exists."""
-        response = await client.head(_AVATAR_URL.format(hash=email_hash))
+        response = await client.head(_AVATAR_CHECK_URL.format(hash=email_hash))
         return response.status_code == 200
 
     def _profile_findings(self, email: str, profile: dict[str, Any]) -> list[Finding]:
@@ -130,7 +131,7 @@ class GravatarCollector(Collector):
             identifiers=[Identifier(type=IdentifierType.EMAIL, value=email)],
             title="Public Gravatar avatar (no public profile)",
             detail="An avatar image is registered for this email, but no public profile page.",
-            source_url=_AVATAR_URL.format(hash=email_hash).replace("?d=404", ""),
+            source_url=_AVATAR_PAGE_URL.format(hash=email_hash),
             confidence=1.0,
             risk=RiskLevel.LOW,
             raw={},
