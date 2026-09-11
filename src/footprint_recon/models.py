@@ -8,6 +8,7 @@ two :class:`Finding` objects as linked whenever they share one.
 from __future__ import annotations
 
 from enum import StrEnum
+from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -80,6 +81,8 @@ class Target(BaseModel):
     domains: list[str] = Field(default_factory=list)
     location: str | None = None
     """Home city/region, e.g. for the `"{full_name}" "{location}"` dork."""
+    file_paths: list[Path] = Field(default_factory=list)
+    """Image files to scan for EXIF leaks (metadata collector). Not an identifier."""
 
     def identifiers(self) -> list[Identifier]:
         """Flatten the populated fields into :class:`Identifier` objects."""
